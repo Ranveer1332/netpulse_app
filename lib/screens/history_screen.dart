@@ -58,6 +58,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final avgDown = _getAvgDownload(records);
     final minLat = _getMinLatency(records);
 
+    // Calculate dynamic Y-axis bounds to prevent lines from breaking out of the chart
+    double maxVal = 100.0;
+    if (records.isNotEmpty) {
+      final maxDownload = records.map((r) => r.downloadMbps).fold(0.0, max);
+      final maxLatency = records.map((r) => r.latencyMs.toDouble()).fold(0.0, max);
+      final highest = max(maxDownload, maxLatency);
+      if (highest > 80) {
+        maxVal = highest + (highest * 0.2); // Add 20% padding at the top
+      }
+    }
+    
+    double yInterval = maxVal / 4;
+    if (yInterval < 25) yInterval = 25;
+
+    // Dynamic X-axis spacing to prevent overlaps
+    double xInterval = (records.length / 5).ceilToDouble();
+    if (xInterval < 1) xInterval = 1;
+
+    final reversedRecords = records.reversed.toList();
+
     return RefreshIndicator(
       color: AppColors.teal,
       backgroundColor: AppColors.card,
@@ -84,19 +104,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             TextStyle(fontSize: 14, color: AppColors.muted),
                       ),
                     ],
-                  ),
-                ),
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.settings_outlined,
-                    color: AppColors.muted,
-                    size: 20,
                   ),
                 ),
               ],
@@ -192,10 +199,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     height: 180,
                     child: LineChart(
                       LineChartData(
+                        clipData: const FlClipData.all(), // Prevent lines from drawing outside the chart area
                         gridData: FlGridData(
                           show: true,
                           drawVerticalLine: false,
-                          horizontalInterval: 25,
+                          horizontalInterval: yInterval,
                           getDrawingHorizontalLine: (_) => FlLine(
                             color: Colors.white.withValues(alpha: 0.05),
                             strokeWidth: 1,
@@ -206,7 +214,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             sideTitles: SideTitles(
                               showTitles: true,
                               reservedSize: 32,
-                              interval: 25,
+                              interval: yInterval,
                               getTitlesWidget: (v, _) => Text(
                                 '${v.toInt()}',
                                 style: const TextStyle(
@@ -219,18 +227,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           bottomTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
-                              interval: 2,
+                              interval: xInterval,
                               getTitlesWidget: (v, _) {
-                                final labels = [
-                                  '9AM', '', '12PM', '', '3PM',
-                                  '', '6PM', '', '9PM', '',
-                                ];
                                 final i = v.toInt();
-                                if (i < 0 || i >= labels.length) {
+                                if (i < 0 || i >= reversedRecords.length) {
                                   return const SizedBox.shrink();
                                 }
+                                
+                                final dt = reversedRecords[i].timestamp;
+                                String label;
+                                if (state.historyRange == 'week') {
+                                  final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                                  label = days[dt.weekday - 1];
+                                } else {
+                                  final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+                                  final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+                                  label = '$h $ampm';
+                                }
+                                
                                 return Text(
-                                  labels[i],
+                                  label,
                                   style: const TextStyle(
                                     fontSize: 10,
                                     color: AppColors.textDim,
@@ -248,7 +264,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ),
                         borderData: FlBorderData(show: false),
                         minY: 0,
-                        maxY: 100,
+                        maxY: maxVal,
                         lineBarsData: [
                           LineChartBarData(
                             spots: _getDownloadSpots(records),

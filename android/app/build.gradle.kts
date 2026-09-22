@@ -29,7 +29,15 @@ android {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
+            // Correct Kotlin DSL syntax to use the debug signing configuration
             signingConfig = signingConfigs.getByName("debug")
+
+            // Correct Kotlin DSL syntax for boolean assignment
+            isDebuggable = false
+
+            // If shrinking/obfuscation is desired, you can add these (optional):
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
     }
 }

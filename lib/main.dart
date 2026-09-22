@@ -9,8 +9,12 @@ import 'screens/diagnose_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/settings_screen.dart';
 
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -31,6 +35,8 @@ void main() async {
       child: const NetPulseApp(),
     ),
   );
+
+  FlutterNativeSplash.remove();
 }
 
 class NetPulseApp extends StatelessWidget {
@@ -198,8 +204,8 @@ class _AppShellState extends State<AppShell> {
                   onTap: () => setState(() => _currentIndex = 2),
                 ),
                 _NavItem(
-                  icon: Icons.build_rounded,
-                  label: 'Tools',
+                  icon: Icons.settings_rounded,
+                  label: 'Settings',
                   isActive: _currentIndex == 3,
                   onTap: () => setState(() => _currentIndex = 3),
                 ),

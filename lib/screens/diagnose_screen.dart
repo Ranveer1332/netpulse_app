@@ -62,11 +62,15 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
             diag?.verdict ??
             'Ready to run diagnosis.');
 
-    // Real measured values from DiagnosisResult
     final packetLoss = diag?.packetLoss ?? 0.0;
     final jitterVar = diag?.jitter ?? 0.0;
     final dnsRes = diag?.dnsResolutionMs ?? 0;
     final ispGateway = diag?.routerIp ?? 'Unknown';
+
+    bool isWanOnly = diag?.hopDiagnosisMode == 'wanOnly';
+    if (diag == null) {
+      isWanOnly = state.connectionType == 'Mobile';
+    }
 
     return RefreshIndicator(
       color: AppColors.teal,
@@ -172,9 +176,9 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
                           color: AppColors.teal.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Text(
-                          '3 Hops',
-                          style: TextStyle(
+                        child: Text(
+                          isWanOnly ? '2 Hops' : '3 Hops',
+                          style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                             color: AppColors.teal,
@@ -195,10 +199,11 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
                         _HopNode(
                             data: deviceHop,
                             icon: Icons.phone_android_rounded),
-                        const _HopConnector(label: 'LAN'),
-                        _HopNode(
-                            data: routerHop,
-                            icon: Icons.router_rounded),
+                        if (!isWanOnly) const _HopConnector(label: 'LAN'),
+                        if (!isWanOnly)
+                          _HopNode(
+                              data: routerHop,
+                              icon: Icons.router_rounded),
                         const _HopConnector(label: 'WAN'),
                         _HopNode(
                             data: internetHop,
@@ -208,19 +213,33 @@ class _DiagnoseScreenState extends State<DiagnoseScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  if (isWanOnly)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        "Router-level diagnosis isn't available on mobile data — no local, pingable gateway exists on cellular networks.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 11, color: AppColors.muted),
+                      ),
+                    ),
+
                   // Latency summary row
                   if (diag != null && !isDiagnosing)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        if (!isWanOnly)
+                          Text(
+                            '• Internal ${deviceHop.ping + routerHop.ping} ms',
+                            style: const TextStyle(
+                                fontSize: 11, color: AppColors.muted),
+                          ),
+                        if (!isWanOnly)
+                          const SizedBox(width: 16),
                         Text(
-                          '• Internal ${deviceHop.ping + routerHop.ping} ms',
-                          style: const TextStyle(
-                              fontSize: 11, color: AppColors.muted),
-                        ),
-                        const SizedBox(width: 16),
-                        Text(
-                          '• External +${internetHop.ping - routerHop.ping > 0 ? internetHop.ping - routerHop.ping : 0} ms',
+                          isWanOnly
+                              ? '• External ${internetHop.ping} ms'
+                              : '• External +${internetHop.ping - routerHop.ping > 0 ? internetHop.ping - routerHop.ping : 0} ms',
                           style: const TextStyle(
                               fontSize: 11, color: AppColors.muted),
                         ),

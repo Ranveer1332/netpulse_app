@@ -1,8 +1,10 @@
 import 'package:network_info_plus/network_info_plus.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'latency_service.dart';
 
 /// Result of a hop-by-hop diagnosis.
 class DiagnosisResult {
+  final String hopDiagnosisMode;
   /// 'good', 'warn', 'bad', or 'testing'
   final String deviceStatus;
   final int deviceLatency;
@@ -26,6 +28,7 @@ class DiagnosisResult {
   final int dnsResolutionMs;
 
   DiagnosisResult({
+    required this.hopDiagnosisMode,
     required this.deviceStatus,
     required this.deviceLatency,
     required this.routerStatus,
@@ -81,6 +84,10 @@ class DiagnosisService {
 
   /// Run a full three-hop diagnosis and return the result.
   Future<DiagnosisResult> diagnose() async {
+    final connResults = await Connectivity().checkConnectivity();
+    final bool isMobile = connResults.contains(ConnectivityResult.mobile);
+    final String hopDiagnosisMode = isMobile ? 'wanOnly' : 'full';
+
     // ─── Hop 0: Device ───────────────────────────────────────────────
     const deviceLatency = 1;
     const deviceStatus = 'good';
@@ -90,24 +97,29 @@ class DiagnosisService {
     int routerLatency = -1;
     String routerStatus = 'bad';
 
-    try {
-      routerIp = await _networkInfo.getWifiGatewayIP();
-    } catch (_) {}
+    if (!isMobile) {
+      try {
+        routerIp = await _networkInfo.getWifiGatewayIP();
+      } catch (_) {}
 
-    if (routerIp != null && routerIp.isNotEmpty) {
-      // Try common router ports: 80 (HTTP admin), 443 (HTTPS), 53 (DNS relay).
-      for (final port in [80, 443, 53]) {
-        routerLatency = await _latency.ping(
-          routerIp,
-          port: port,
-          timeout: const Duration(seconds: 2),
-        );
-        if (routerLatency >= 0) break;
-      }
+      if (routerIp != null && routerIp.isNotEmpty) {
+        // Try common router ports: 80 (HTTP admin), 443 (HTTPS), 53 (DNS relay).
+        for (final port in [80, 443, 53]) {
+          routerLatency = await _latency.ping(
+            routerIp,
+            port: port,
+            timeout: const Duration(seconds: 2),
+          );
+          if (routerLatency >= 0) break;
+        }
 
-      if (routerLatency >= 0) {
-        routerStatus = routerLatency < 50 ? 'good' : 'warn';
+        if (routerLatency >= 0) {
+          routerStatus = routerLatency < 50 ? 'good' : 'warn';
+        }
       }
+    } else {
+      routerStatus = 'good';
+      routerLatency = 0;
     }
 
     // ─── Hop 2: External / Internet (WAN) ────────────────────────────
@@ -176,28 +188,37 @@ class DiagnosisService {
     // ─── Verdict logic ───────────────────────────────────────────────
     String verdict;
 
-    if (routerLatency < 0 && routerIp == null) {
-      verdict = 'Cannot determine gateway — are you connected to WiFi?';
-    } else if (routerLatency < 0) {
-      verdict = 'Cannot reach your router — check your local network.';
-    } else if (externalLatency < 0) {
-      verdict =
-          'Your router is reachable but the internet is not — possible ISP outage.';
-    } else if (packetLoss > 10) {
-      verdict =
-          'High packet loss detected (${packetLoss.toStringAsFixed(0)}%). Your connection is unstable.';
-    } else if (routerLatency < 50 && externalLatency > 100) {
-      verdict =
-          'Your WiFi is fine — the slowdown is from your ISP.';
-    } else if (routerLatency >= 50 && externalLatency > 100) {
-      verdict =
-          'Both your router and internet are slow — the issue is likely your local WiFi/router.';
+    if (isMobile) {
+      if (externalStatus == 'good') {
+        verdict = 'Mobile connection is healthy.';
+      } else {
+        verdict = 'Mobile/carrier connection is slow right now.';
+      }
     } else {
-      verdict =
-          'All hops look healthy! Your connection is performing well.';
+      if (routerLatency < 0 && routerIp == null) {
+        verdict = 'Cannot determine gateway — are you connected to WiFi?';
+      } else if (routerLatency < 0) {
+        verdict = 'Cannot reach your router — check your local network.';
+      } else if (externalLatency < 0) {
+        verdict =
+            'Your router is reachable but the internet is not — possible ISP outage.';
+      } else if (packetLoss > 10) {
+        verdict =
+            'High packet loss detected (${packetLoss.toStringAsFixed(0)}%). Your connection is unstable.';
+      } else if (routerLatency < 50 && externalLatency > 100) {
+        verdict =
+            'Your WiFi is fine — the slowdown is from your ISP.';
+      } else if (routerLatency >= 50 && externalLatency > 100) {
+        verdict =
+            'Both your router and internet are slow — the issue is likely your local WiFi/router.';
+      } else {
+        verdict =
+            'All hops look healthy! Your connection is performing well.';
+      }
     }
 
     return DiagnosisResult(
+      hopDiagnosisMode: hopDiagnosisMode,
       deviceStatus: deviceStatus,
       deviceLatency: deviceLatency,
       routerStatus: routerStatus,

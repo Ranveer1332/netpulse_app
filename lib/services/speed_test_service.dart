@@ -27,8 +27,8 @@ class SpeedTestService {
 
   // ── Tuning constants ──────────────────────────────────────────────
   static const _numConnections = 6;
-  static const _maxTestDurationMs = 12000; // 12 seconds hard cap
-  static const _uploadBytes = 2000000; // 2 MB
+  static const _maxTestDurationMs = 8000; // 8 seconds hard cap
+  static const _uploadBytes = 1000000; // 1 MB
 
   /// Stream-download a test file and return the measured speed in Mbps.
   ///
@@ -162,49 +162,110 @@ class SpeedTestService {
     }
   }
 
+  // ── Upload test endpoints ─────────────────────────────────────────
+  static const _uploadUrls = [
+    'http://speedtest.tele2.net/upload.php',
+    'http://speedtest.singapore.linode.com/empty.php',
+    'https://httpbin.org/post'
+  ];
+
   /// Measure upload speed in Mbps.
   ///
-  /// Uses a StreamedRequest so we can time ONLY the upload phase
-  /// (sending the request body), not the server's response download.
-  ///
-  /// Returns -1 on timeout or any network error.
+  /// Uses multiple parallel chunked streams to accurately measure
+  /// the bandwidth of the connection without waiting for full server responses.
+  /// Returns -1 on network error.
   Future<double> measureUpload() async {
-    final client = http.Client();
-    final payload = Uint8List(_uploadBytes);
+    for (final url in _uploadUrls) {
+      final speed = await _tryUpload(url);
+      if (speed >= 0) return speed;
+    }
+    return -1;
+  }
 
-    try {
-      final request = http.StreamedRequest('POST', Uri.parse(_uploadUrl));
-      request.headers['Content-Type'] = 'application/octet-stream';
-      request.contentLength = _uploadBytes;
+  Future<double> _tryUpload(String url) async {
+    final stopwatch = Stopwatch()..start();
+    final byteCounts = List<int>.filled(_numConnections, 0);
+    bool isTesting = true;
+    bool anySuccess = false;
+    final allDone = Completer<void>();
+    int finishedCount = 0;
 
-      final stopwatch = Stopwatch()..start();
-
-      // Send the request (starts the upload).
-      final responseFuture = client.send(request);
-
-      // Write the payload.
-      request.sink.add(payload);
-      await request.sink.close();
-
-      // Wait for the server to acknowledge.
-      final response = await responseFuture.timeout(
-        const Duration(seconds: 30),
-      );
-
-      stopwatch.stop();
-
-      // Drain response to free resources (don't time this).
-      await response.stream.drain();
-
-      if (response.statusCode == 200) {
-        final bits = _uploadBytes * 8;
-        final seconds = stopwatch.elapsedMilliseconds / 1000.0;
-        if (seconds <= 0) return 0;
-        return bits / seconds / 1000000; // Mbps
+    void onStreamFinished() {
+      finishedCount++;
+      if (finishedCount >= _numConnections && !allDone.isCompleted) {
+        allDone.complete();
       }
-      return -1;
+    }
+
+    for (int i = 0; i < _numConnections; i++) {
+      _runUploadStream(i, url, byteCounts, () => isTesting, (success) {
+        if (success) anySuccess = true;
+        onStreamFinished();
+      });
+    }
+
+    // Give it a moment to connect
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    while (isTesting && stopwatch.elapsedMilliseconds < _maxTestDurationMs) {
+      await Future.any([
+        Future.delayed(const Duration(milliseconds: 250)),
+        allDone.future,
+      ]);
+      if (allDone.isCompleted) break;
+    }
+
+    isTesting = false;
+
+    if (!allDone.isCompleted) {
+      await Future.any([
+        allDone.future,
+        Future.delayed(const Duration(seconds: 1)),
+      ]);
+    }
+
+    stopwatch.stop();
+
+    final totalBytes = byteCounts.reduce((a, b) => a + b);
+    if (!anySuccess || totalBytes == 0) return -1;
+
+    final seconds = stopwatch.elapsedMilliseconds / 1000.0;
+    if (seconds <= 0) return -1;
+
+    return (totalBytes * 8) / seconds / 1000000;
+  }
+
+  void _runUploadStream(
+    int index,
+    String url,
+    List<int> byteCounts,
+    bool Function() shouldContinue,
+    void Function(bool success) onDone,
+  ) async {
+    final client = http.Client();
+    try {
+      final request = http.StreamedRequest('POST', Uri.parse(url));
+      request.headers['Content-Type'] = 'application/octet-stream';
+      // Fake a huge content length so the server keeps reading
+      request.contentLength = 100000000; // 100 MB
+
+      // Start the request and ignore the response
+      client.send(request).then((_) {}).catchError((_) {});
+
+      Stream<List<int>> generateChunks() async* {
+        final chunk = Uint8List(65536); // 64 KB chunks
+        while (shouldContinue()) {
+          yield chunk;
+          byteCounts[index] += chunk.length;
+        }
+      }
+
+      await request.sink.addStream(generateChunks());
+      await request.sink.close();
+      
+      onDone(true);
     } catch (_) {
-      return -1;
+      onDone(false);
     } finally {
       client.close();
     }

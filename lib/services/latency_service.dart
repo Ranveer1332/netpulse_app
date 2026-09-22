@@ -21,7 +21,7 @@ class LatencyService {
   Future<int> ping(
     String host, {
     int port = defaultPort,
-    Duration timeout = const Duration(seconds: 5),
+    Duration timeout = const Duration(seconds: 2),
   }) async {
     final stopwatch = Stopwatch()..start();
     try {
