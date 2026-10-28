@@ -29,19 +29,14 @@ class SpeedGauge extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [AppColors.teal, AppColors.blue],
-                ).createShader(bounds),
-                child: Text(
-                  speed.toStringAsFixed(1),
-                  style: const TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1,
-                    letterSpacing: -2,
-                  ),
+              Text(
+                speed.toStringAsFixed(1),
+                style: const TextStyle(
+                  fontSize: 48,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text,
+                  height: 1,
+                  letterSpacing: -2,
                 ),
               ),
               const SizedBox(height: 2),
@@ -85,7 +80,7 @@ class _GaugePainter extends CustomPainter {
 
     // Track
     final trackPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.05)
+      ..color = Colors.black.withValues(alpha: 0.05)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 12
       ..strokeCap = StrokeCap.round;
@@ -97,16 +92,11 @@ class _GaugePainter extends CustomPainter {
       trackPaint,
     );
 
-    // Value arc with gradient
+    // Value arc with solid color
     if (fraction > 0) {
       final rect = Rect.fromCircle(center: center, radius: radius);
-      final gradient = SweepGradient(
-        startAngle: startAngle,
-        endAngle: startAngle + sweepAngle,
-        colors: const [AppColors.teal, AppColors.blue],
-      );
       final valuePaint = Paint()
-        ..shader = gradient.createShader(rect)
+        ..color = AppColors.teal
         ..style = PaintingStyle.stroke
         ..strokeWidth = 12
         ..strokeCap = StrokeCap.round;

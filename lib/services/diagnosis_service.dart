@@ -43,39 +43,7 @@ class DiagnosisResult {
   });
 }
 
-/// Hop-by-hop network diagnosis — the flagship feature.
-///
-/// How it works (for viva):
-///
-/// 1. The device itself is always considered reachable (hop 0, ~1 ms).
-///
-/// 2. We discover the local gateway (router) IP using network_info_plus,
-///    which reads the OS routing table.  Then we open a TCP connection
-///    to the router on port 80 (HTTP admin panel — most consumer routers
-///    listen here) and measure the round-trip time.  This tells us how
-///    healthy the LAN segment is.
-///
-/// 3. We open a TCP connection to Google Public DNS (8.8.8.8) on port 53.
-///    This traverses the full path: device → router → ISP → internet.
-///    The round-trip time tells us about the WAN segment.
-///
-/// 4. By comparing router RTT vs external RTT we can isolate WHERE the
-///    bottleneck is:
-///
-///    | Router   | External   | Meaning                                     |
-///    |----------|------------|---------------------------------------------|
-///    | Fast     | Slow       | LAN is fine, ISP is the bottleneck           |
-///    | Slow     | Slow       | LAN itself is the problem (bad WiFi/router)  |
-///    | Timeout  | Any        | Can't even reach the router                  |
-///    | Fast     | Timeout    | ISP or upstream is down                      |
-///    | Fast     | Fast       | Everything looks healthy                     |
-///
-/// 5. Packet Loss: We send [pingCount] TCP pings and count how many fail.
-///    packetLoss = (failures / total) × 100%.
-///
-/// 6. Jitter: For successful pings, we compute the mean absolute difference
-///    between consecutive readings (RFC 3550).
-///
+
 class DiagnosisService {
   final LatencyService _latency = LatencyService();
   final NetworkInfo _networkInfo = NetworkInfo();

@@ -1,6 +1,5 @@
 import 'dart:math';
 
-/// Result of an anomaly check.
 class AnomalyResult {
   final bool isAnomaly;
   final String message;
@@ -17,23 +16,7 @@ class AnomalyResult {
   });
 }
 
-/// Lightweight statistical anomaly detection — NO ML libraries.
-///
-/// Maintains a rolling window of the last ~20 latency readings and
-/// flags new readings that deviate more than 2 standard deviations
-/// from the rolling average.
-///
-/// The math (for viva):
-///
-///   mean   = Σ(values) / n
-///   stddev = √( Σ(xi − mean)² / n )
-///   z-score = |new_value − mean| / stddev
-///
-///   If z-score > 2  →  the reading is in the top/bottom ~2.3% of
-///   the distribution, which we flag as anomalous.
-///
-/// This is a standard z-score test, the same concept used in process
-/// control (Six Sigma) and network monitoring.
+
 class AnomalyService {
   static const int windowSize = 20;
   static const double threshold = 2.0;

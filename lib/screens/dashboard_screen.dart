@@ -185,16 +185,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               height: 54,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      state.connectionType == 'None'
-                          ? AppColors.muted
-                          : AppColors.teal,
-                      state.connectionType == 'None'
-                          ? AppColors.muted
-                          : AppColors.blue
-                    ],
-                  ),
+                  color: state.connectionType == 'None'
+                      ? AppColors.muted
+                      : AppColors.teal,
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     if (state.connectionType != 'None')
@@ -229,7 +222,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     textStyle: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      fontFamily: 'Inter',
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),

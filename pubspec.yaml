@@ -48,6 +48,7 @@ dependencies:
   hive_flutter: ^1.1.0
   path_provider: ^2.1.5
   share_plus: ^10.0.0
+  google_fonts: ^8.2.1
 
 dev_dependencies:
   flutter_test:
@@ -111,10 +112,10 @@ flutter_launcher_icons:
   min_sdk_version: 21
 
 flutter_native_splash:
-  color: "#0B1220"
+  color: "#F4EFE6"
   image: "assets/splash.jpg"
   android: true
   ios: true
   android_12:
-    color: "#0B1220"
+    color: "#F4EFE6"
     image: "assets/splash.jpg"
